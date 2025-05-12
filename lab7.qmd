@@ -5,16 +5,47 @@ format: html
 editor: visual
 ---
 
-## Quarto
+```{r}
+library(dplyr)
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+state_capitals <- read.table(here::here("state_capitals_ll.txt"))
+state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
+state_capitals_clean <- state_capitals[ ,2:3]
+state_capitals_clean <- state_capitals_clean %>%
+  mutate(
+    latitudes = V2,
+    longitudes = V3
+  ) %>%
+  select(latitudes, longitudes)
 
-## Running Code
+locations <- split(state_capitals_clean, seq(nrow(state_capitals_clean)))  # Split into list of rows
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+```
+
+# Pass Times for U.S State Capitals
+
+## 1.
 
 ```{r}
-1 + 1
+library(httr)
+library(jsonlite)
+```
+
+```{r}
+locations <- list(
+  list(lat = 32.36154, lon = -86.27912),
+  list(lat = 58.30194, lon = -134.41974)
+)
+```
+
+```{r}
+res = GET("https://api.g7vrd.co.uk/v1/satellite-passes/25544/32.36154/-86.27912.json")
+```
+
+
+```{r}
+data = fromJSON(rawToChar(res$content))
+data$passes
 ```
 
 You can add options to executable code like this
