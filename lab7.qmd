@@ -1,10 +1,16 @@
 ---
+<<<<<<< HEAD
 title: "Lab7"
 author: "Jacob and Zach"
+=======
+title: "Lab 7"
+author: "J and Z"
+>>>>>>> jacob
 format: html
 editor: visual
 ---
 
+<<<<<<< HEAD
 ## Quarto
 
 Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
@@ -15,6 +21,51 @@ When you click the **Render** button a document will be generated that includes 
 
 ```{r}
 1 + 1
+=======
+```{r}
+library(dplyr)
+
+state_capitals <- read.table(here::here("state_capitals_ll.txt"))
+state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
+
+state_capitals_clean <- state_capitals %>%
+  mutate(
+    state = V1,
+    latitudes = V2,
+    longitudes = V3
+  ) %>%
+  select(state, latitudes, longitudes)
+
+state_capitals_clean
+```
+
+# Pass Times for U.S State Capitals
+
+## 1.
+
+```{r}
+library(httr)
+library(jsonlite)
+```
+
+
+
+```{r}
+res = GET("https://api.g7vrd.co.uk/v1/satellite-passes/25544/32.36154/-86.27912.json")
+```
+
+
+```{r}
+library(lubridate)
+
+data = fromJSON(rawToChar(res$content))
+
+data$passes %>%
+  mutate(
+    tca_readable = ymd_hms(tca, tz = "UTC")
+  )
+
+>>>>>>> jacob
 ```
 
 You can add options to executable code like this
