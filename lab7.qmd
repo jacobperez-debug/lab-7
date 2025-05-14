@@ -1,11 +1,6 @@
 ---
-<<<<<<< HEAD
 title: "Lab7"
 author: "Jacob and Zach"
-=======
-title: "Lab 7"
-author: "J and Z"
->>>>>>> jacob
 format: html
 editor: visual
 ---
@@ -19,9 +14,6 @@ Quarto enables you to weave together content and executable code into a finished
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
-```{r}
-1 + 1
-=======
 ```{r}
 library(dplyr)
 
@@ -64,15 +56,7 @@ data$passes %>%
   mutate(
     tca_readable = ymd_hms(tca, tz = "UTC")
   )
-
->>>>>>> jacob
 ```
 
-You can add options to executable code like this
 
-```{r}
-#| echo: false
-2 * 2
-```
 
-The `echo: false` option disables the printing of code (only output is displayed).
