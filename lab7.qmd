@@ -10,16 +10,16 @@ library(dplyr)
 
 state_capitals <- read.table(here::here("state_capitals_ll.txt"))
 state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
-state_capitals_clean <- state_capitals[ ,2:3]
-state_capitals_clean <- state_capitals_clean %>%
+
+state_capitals_clean <- state_capitals %>%
   mutate(
+    state = V1,
     latitudes = V2,
     longitudes = V3
   ) %>%
-  select(latitudes, longitudes)
+  select(state, latitudes, longitudes)
 
-locations <- split(state_capitals_clean, seq(nrow(state_capitals_clean)))  # Split into list of rows
-
+state_capitals_clean
 ```
 
 # Pass Times for U.S State Capitals
@@ -31,12 +31,7 @@ library(httr)
 library(jsonlite)
 ```
 
-```{r}
-locations <- list(
-  list(lat = 32.36154, lon = -86.27912),
-  list(lat = 58.30194, lon = -134.41974)
-)
-```
+
 
 ```{r}
 res = GET("https://api.g7vrd.co.uk/v1/satellite-passes/25544/32.36154/-86.27912.json")
@@ -44,8 +39,15 @@ res = GET("https://api.g7vrd.co.uk/v1/satellite-passes/25544/32.36154/-86.27912.
 
 
 ```{r}
+library(lubridate)
+
 data = fromJSON(rawToChar(res$content))
-data$passes
+
+data$passes %>%
+  mutate(
+    tca_readable = ymd_hms(tca, tz = "UTC")
+  )
+
 ```
 
 You can add options to executable code like this
