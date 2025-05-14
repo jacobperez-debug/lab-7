@@ -1,0 +1,17 @@
+---
+title: "misc work"
+format: html
+editor: visual
+---
+
+to-do: write a function to take a list/df and insert each row into a string
+```{r}
+data.frame(x= c("erm", "erm2", "erm3"), y=c("bungus", "bingus", "bongus"))
+
+
+iterate <- function(df, lat, long){
+  string
+  
+  }
+
+```
