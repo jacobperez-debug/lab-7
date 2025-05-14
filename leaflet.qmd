@@ -1,0 +1,57 @@
+---
+title: "leaflet plot"
+format: html
+editor: visual
+---
+
+```{r}
+library(leaflet)
+library(dplyr)
+library(htmltools)
+```
+
+```{r}
+state_capitals <- read.table(here::here("state_capitals_ll.txt"))
+state_capitals_name <- read.table(here::here("state_capitals_name.txt"))
+
+state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
+
+state_capitals_clean <- state_capitals %>%
+  mutate(
+    state = V1,
+    latitudes = V2,
+    longitudes = V3
+  ) %>%
+  select(state, latitudes, longitudes)
+```
+
+```{r}
+state_capitals_clean <- state_capitals_clean %>%
+  inner_join(state_capitals_name, by = join_by(state == V1)) %>%
+  mutate(capital_name = V2) %>%
+  select(state, capital_name, latitudes, longitudes)
+```
+
+```{r}
+helmet_icon <- makeIcon(
+  iconUrl = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/characters/nautilus/skins/skin03/images/nautilus_splash_tile_3.jpg",
+  iconWidth = 15, 
+  iconHeight = 15
+  )
+
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = jitter(state_capitals_clean$longitudes, 
+                          factor = 2), 
+             lat = jitter(state_capitals_clean$latitudes,
+                          factor = 2), 
+             icon = helmet_icon,
+             popup = paste(state_capitals_clean$capital_name, ", ", state_capitals_clean$state, "<br>",
+                           "Time 1: ", "<br>",
+                           "Time 2: ", "<br>",
+                           "Time 3: "),
+             label = paste0(state_capitals_clean$capital_name, ", ", state_capitals_clean$state)
+             )
+```
+
+
