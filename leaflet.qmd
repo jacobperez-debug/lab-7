@@ -1,0 +1,153 @@
+---
+title: "leaflet plot"
+format: html
+editor: visual
+---
+
+```{r}
+library(leaflet)
+library(dplyr)
+library(htmltools)
+```
+
+```{r}
+state_capitals <- read.table(here::here("state_capitals_ll.txt"))
+state_capitals_name <- read.table(here::here("state_capitals_name.txt"))
+
+state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
+
+state_capitals_clean <- state_capitals %>%
+  mutate(
+    state = V1,
+    latitudes = V2,
+    longitudes = V3
+  ) %>%
+  select(state, latitudes, longitudes)
+```
+
+```{r}
+iterate_loop_json <- function(df){
+  results <- list() # Initialize a list to store results for each row
+
+  for(i in 1:nrow(df)){
+    state <- df$state[i]
+    latitude <- df$latitudes[i]
+    longitude <- df$longitudes[i]
+    url <- paste0("https://api.g7vrd.co.uk/v1/satellite-passes/25544/", latitude, "/", longitude, ".json")
+    
+    # Make the API request
+    response <- GET(url)
+
+    if (http_status(response)$category == "Success") {
+      # Parse the JSON content
+      json_data <- fromJSON(rawToChar(response$content))
+      passes_data <- head(json_data$passes$tca,3)
+      
+      # Store the relevant data
+      results[[i]] <- list(state = state, latitude = latitude, longitude = longitude, passes = passes_data)
+    }
+    
+    else {
+      # Handle potential errors (e.g., API request failed)
+      cat("Error fetching data for latitude:", latitude, ", longitude:", longitude, "\n")
+      
+      results[[i]] <- list(state = state, latitude = latitude, longitude = longitude, error = http_status(response)$message)
+    }
+  }
+  return(results)
+}
+
+# Assuming 'state_capitals_clean' is your data frame with 'latitudes' and 'longitudes' columns
+api_data <- iterate_loop_json(state_capitals_clean)
+{r}
+convert_api_to_df <- function(api_data) {
+  # Create empty vectors to store the extracted data
+  states <- character(length(api_data))
+  latitudes <- numeric(length(api_data))
+  longitudes <- numeric(length(api_data))
+  
+  # For passes, we'll create a list to store all pass values
+  # and then determine how many columns we need
+  all_passes <- vector("list", length(api_data))
+  max_passes <- 0
+  
+  # Extract data from each state entry
+  for (i in 1:length(api_data)) {
+    state_data <- api_data[[i]]
+    
+    states[i] <- state_data[[1]]  # state
+    latitudes[i] <- state_data[[2]]  # latitude
+    longitudes[i] <- state_data[[3]]  # longitude
+    
+    # Store the passes and update max_passes if needed
+    passes <- state_data[[4]]
+    all_passes[[i]] <- passes
+    max_passes <- max(max_passes, length(passes))
+  }
+  
+  # Create the base dataframe
+  df <- data.frame(
+    state = states,
+    latitude = latitudes,
+    longitude = longitudes,
+    stringsAsFactors = FALSE
+  )
+  
+  # Add pass columns based on the maximum number found
+  for (p in 1:max_passes) {
+    pass_col <- character(length(api_data))
+    
+    for (i in 1:length(api_data)) {
+      passes <- all_passes[[i]]
+      if (p <= length(passes)) {
+        pass_col[i] <- passes[p]
+      } else {
+        pass_col[i] <- NA
+      }
+    }
+    
+    # Add this pass column to the dataframe
+    col_name <- paste0("pass", p)
+    df[[col_name]] <- pass_col
+  }
+  
+  return(df)
+}
+
+final_state_capitals <- convert_api_to_df(api_data)
+```
+
+```{r}
+final_state_capitals <- final_state_capitals %>%
+  inner_join(state_capitals_name, by = join_by(state == V1)) %>%
+  mutate(capital_name = V2) %>%
+  select(state, capital_name, latitude, longitude, pass1, pass2, pass3) %>%
+  slice(-2)
+```
+
+```{r}
+write.csv(final_state_capitals, "final_state_capitals.csv")
+```
+
+```{r}
+helmet_icon <- makeIcon(
+  iconUrl = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/characters/nautilus/skins/skin03/images/nautilus_splash_tile_3.jpg",
+  iconWidth = 15, 
+  iconHeight = 15
+  )
+
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = jitter(final_state_capitals$longitude, 
+                          factor = 2), 
+             lat = jitter(final_state_capitals$latitude,
+                          factor = 2), 
+             icon = helmet_icon,
+             popup = paste(final_state_capitals$capital_name, ", ", final_state_capitals$state, "<br>",
+                           "Time 1: ", final_state_capitals$pass1, "<br>",
+                           "Time 2: ", final_state_capitals$pass2, "<br>",
+                           "Time 3: ", final_state_capitals$pass3),
+             label = paste0(final_state_capitals$capital_name, ", ", final_state_capitals$state, "<br>",
+                            "Soonest Pass Time: ", final_state_capitals$pass1)
+             )
+```
