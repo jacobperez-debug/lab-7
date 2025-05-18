@@ -3,21 +3,30 @@ title: "Lab7"
 author: "Jacob and Zach"
 format: html
 editor: visual
+embed-resources: true
 ---
 
 ```{r}
 #| label: load libraries
+#| message: false
 
+# load libraries
 library(dplyr)
 library(httr)
 library(jsonlite)
+library(tidyverse)
+library(here)
+library(leaflet)
 ```
+
+### Load and Clean Data 
 
 ```{r}
 #| label: clean dataset
 
-state_capitals <- read.table(here::here("state_capitals_ll.txt"))
-state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
+state_capitals <- read.table(here("state_capitals_ll.txt"))
+state_capitals_name <- read.table(here("state_capitals_name.txt"))
+state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US", "AK"))
 
 state_capitals_clean <- state_capitals %>%
   mutate(
@@ -26,28 +35,179 @@ state_capitals_clean <- state_capitals %>%
     longitudes = V3
   ) %>%
   select(state, latitudes, longitudes)
-
-state_capitals_clean
 ```
 
 # Pass Times for U.S State Capitals
 
-## 1.
+## Function 1 to get all relevant json info
 
 ```{r}
-res = GET("https://api.g7vrd.co.uk/v1/satellite-passes/25544/32.36154/-86.27912.json")
+# 
+get_json_info <- function(df){
+  #make empty list
+  results <- list() 
+
+  #iterate through the df to get each state, lat, long, and plug each into url.
+  for(i in 1:nrow(df)){
+    state <- df$state[i]
+    latitude <- df$latitudes[i]
+    longitude <- df$longitudes[i]
+    url <- paste0("https://api.g7vrd.co.uk/v1/satellite-passes/25544/", latitude, "/", longitude, ".json")
+    
+    # make an API request for each url
+    response <- GET(url)
+    
+    #if the response works
+    if (http_status(response)$category == "Success") {
+      
+      # grab the json content, the first 3 satellite passes
+      json_data <- fromJSON(rawToChar(response$content))
+      passes_data <- head(json_data$passes$tca,3)
+      
+      # Store the relevant data in the list
+      results[[i]] <- list(state = state, latitude = latitude, longitude = longitude, passes = passes_data)
+    }
+    
+    #if the response didn't work
+    else {
+      cat("Error fetching data for latitude:", latitude, ", longitude:", longitude)
+      
+      results[[i]] <- list(state = state, latitude = latitude, longitude = longitude, error = http_status(response)$message)
+    }
+  }
+  #after the looping, return the list
+  return(results)
+}
+
+api_data <- get_json_info(state_capitals_clean)
+
+# used Gemini to help with the above function
 ```
 
+## Function 2 to convert it to a nice df
+
 ```{r}
-library(lubridate)
+convert_api_to_df <- function(api_data) {
+ 
+   # make vectors to store state/lat/long
+  states <- character(length(api_data))
+  latitudes <- numeric(length(api_data))
+  longitudes <- numeric(length(api_data))
+  
+  # create a list to store all pass values
+  all_passes <- vector("list", length(api_data))
+  
+  # initialize the var telling us how many satellite passes (up to 3)
+  max_passes <- 0
+  
+# grab data from each state entry
+  
+  # for every state
+  for (i in 1:length(api_data)) {
+    #store the state specific data for state i
+    state_data <- api_data[[i]]
+    
+    #grab the state specifc data for the df
+    states[i] <- state_data[[1]]  # state
+    latitudes[i] <- state_data[[2]]  # lat
+    longitudes[i] <- state_data[[3]]  # long
+    
+    # store passes and update max_passes (if needed) for the df
+    passes <- state_data[[4]]
+    all_passes[[i]] <- passes
+    max_passes <- max(3, length(passes))
+  }
+  
+  # structure the final df
+  df <- data.frame(
+    state = states,
+    latitude = latitudes,
+    longitude = longitudes
+  )
+  
+# add satellite pass columns based on the maximum number found
+  
+  # for every pass
+  for (p in 1:max_passes) {
+    #create vector to hold pass time 
+    pass_col <- character(length(api_data))
+    
+    # for each state
+    for (i in 1:length(api_data)) {
+      #grab list of passes for current state
+      passes <- all_passes[[i]]
+      #if the pass position exisits for current state
+      if (p <= length(passes)) {
+        #put the pass time in the pass_col vector
+        pass_col[i] <- passes[p]
+      } else {
+        #otherwise put NA in the vector
+        pass_col[i] <- NA
+      }
+    }
+    
+    # make name of pass column for the dataframe
+    colname <- paste0("pass", p)
+    #add col to the dataframe
+    df[[colname]] <- pass_col
+  }
+  
+  return(df)
+}
 
-data = fromJSON(rawToChar(res$content))
+final_state_capitals <- convert_api_to_df(api_data)
 
-data$passes %>%
-  mutate(
-    tca_readable = ymd_hms(tca, tz = "UTC")
+# Used Claude to help with the above funciton
+```
+
+### Converting to Readable Times and Joining Capital Names
+
+```{r}
+final_state_capitals <- final_state_capitals %>%
+  inner_join(state_capitals_name, by = join_by(state == V1)) %>%
+  mutate(capital_name = V2,
+         pass1 = ymd_hms(pass1, tz = "UTC"),
+         pass2 = ymd_hms(pass2, tz = "UTC"),
+         pass3 = ymd_hms(pass3, tz = "UTC")) %>%
+  select(state, capital_name, latitude, longitude, pass1, pass2, pass3)
+```
+
+# Mapping the Data
+
+## Drawing the Route of the ISS
+
+### Sorting Pass Times
+
+```{r}
+state_capitals_sorted <- final_state_capitals[order(as.POSIXct(final_state_capitals$pass1)), ] 
+```
+
+### Creating Icon for Cities
+
+```{r}
+helmet_icon <- makeIcon(
+  iconUrl = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/characters/nautilus/skins/skin03/images/nautilus_splash_tile_3.jpg",
+  iconWidth = 15, 
+  iconHeight = 15
   )
 ```
 
+### Leaflet Plot
 
-
+```{r}
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = jitter(state_capitals_sorted$longitude, 
+                          factor = 2), 
+             lat = jitter(state_capitals_sorted$latitude,
+                          factor = 2), 
+             icon = helmet_icon,
+             popup = paste(state_capitals_sorted$capital_name, ", ", state_capitals_sorted$state, "<br>",
+                           "Time 1: ", state_capitals_sorted$pass1, "<br>",
+                           "Time 2: ", state_capitals_sorted$pass2, "<br>",
+                           "Time 3: ", state_capitals_sorted$pass3),
+             label = paste0(state_capitals_sorted$capital_name, ", ", state_capitals_sorted$state, ".",  " Soonest Pass Time: ", state_capitals_sorted$pass1)
+             ) %>%
+  addPolylines(lat = state_capitals_sorted$latitude, lng = state_capitals_sorted$longitude)
+  
+```
