@@ -4,23 +4,47 @@ format: html
 editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
 ```{r}
-1 + 1
+library(leaflet)
+library(dplyr)
+library(lubridate)
 ```
 
-You can add options to executable code like this
-
 ```{r}
-#| echo: false
-2 * 2
+final_state_capitals <- read.csv(here::here("final_state_capitals.csv"))
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+final_state_capitals <- final_state_capitals %>%
+  inner_join(state_capitals_name, by = join_by(state == V1)) %>%
+  mutate(capital_name = V2,
+         pass1 = ymd_hms(pass1, tz = "UTC"),
+         pass2 = ymd_hms(pass2, tz = "UTC"),
+         pass3 = ymd_hms(pass3, tz = "UTC")) %>%
+  select(state, capital_name, latitude, longitude, pass1, pass2, pass3)
+```
+
+```{r}
+state_capitals_sorted <- final_state_capitals[order(as.POSIXct(final_state_capitals$pass1)), ] 
+```
+
+```{r}
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng = jitter(state_capitals_sorted$longitude, 
+                          factor = 2), 
+             lat = jitter(state_capitals_sorted$latitude,
+                          factor = 2), 
+             icon = helmet_icon,
+             popup = paste(state_capitals_sorted$capital_name, ", ", state_capitals_sorted$state, "<br>",
+                           "Time 1: ", state_capitals_sorted$pass1, "<br>",
+                           "Time 2: ", state_capitals_sorted$pass2, "<br>",
+                           "Time 3: ", state_capitals_sorted$pass3),
+             label = paste0(state_capitals_sorted$capital_name, ", ", state_capitals_sorted$state, ".",  " Soonest Pass Time: ", state_capitals_sorted$pass1)
+             ) %>%
+  addPolylines(lat = state_capitals_sorted$latitude, lng = state_capitals_sorted$longitude)
+  
+```
+
+
+
