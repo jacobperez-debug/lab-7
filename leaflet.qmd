@@ -59,6 +59,7 @@ iterate_loop_json <- function(df){
 
 # Assuming 'state_capitals_clean' is your data frame with 'latitudes' and 'longitudes' columns
 api_data <- iterate_loop_json(state_capitals_clean)
+
 {r}
 convert_api_to_df <- function(api_data) {
   # Create empty vectors to store the extracted data
