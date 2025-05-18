@@ -1,0 +1,192 @@
+---
+title: "misc work"
+format: html
+editor: visual
+---
+
+
+```{r}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(here)
+```
+
+
+```{r}
+state_capitals <- read.table(here("state_capitals_ll.txt"))
+state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US", "AK"))
+
+state_capitals_clean <- state_capitals %>%
+  mutate(
+    state = V1,
+    latitudes = V2,
+    longitudes = V3
+  ) %>%
+  select(state, latitudes, longitudes)
+
+state_capitals_clean
+```
+
+
+to-do: write a function to take a list/df and insert each row into a string
+
+```{r}
+df <- data.frame(x= c("erm", "erm2", "erm3"), y=c("bungus", "bingus", "bongus"))
+
+
+iterate <- function(df, lat, long){
+  string <- paste0("Put", df$lat, "here and put", df$long, "here")
+  return(string)
+  }
+
+iterate(df, x, y)
+```
+```{r}
+df <- data.frame(x= c("erm", "erm2", "erm3"), y=c("bungus", "bingus", "bongus"))
+
+iterate_loop <- function(df){
+  output_strings <- character(nrow(df)) # Initialize an empty character vector
+  for(i in 1:nrow(df)){
+    output_strings[i] <- paste0("https://api.g7vrd.co.uk/v1/satellite-passes/25544/",df$x[i],"/",df$y[i],".json")
+  }
+  return(data.frame(output = output_strings))
+}
+
+result_df_loop <- iterate_loop(df)
+print(result_df_loop)
+```
+
+
+Bigger one ( not working)
+```{r}
+iterate_loop <- function(df){
+  output_strings <- character(nrow(df)) # Initialize an empty character vector
+  for(i in 1:nrow(df)){
+    res[i] <- GET(paste0("https://api.g7vrd.co.uk/v1/satellite-passes/25544/",df$latitudes[i],"/",df$longitudes[i],".json"))
+    jsondat[i] <- fromJSON(rawToChar(res[i]$content))
+    passes[i] <- jsondat[i]$passes
+  }
+}
+
+iterate_loop(state_capitals_clean)
+```
+
+function 1 to get all relevant json info
+```{r}
+get_json_info <- function(df){
+  #make empty list
+  results <- list() 
+
+  #iterate through the df to get each state, lat, long, and plug each into url.
+  for(i in 1:nrow(df)){
+    state <- df$state[i]
+    latitude <- df$latitudes[i]
+    longitude <- df$longitudes[i]
+    url <- paste0("https://api.g7vrd.co.uk/v1/satellite-passes/25544/", latitude, "/", longitude, ".json")
+    
+    # make an API request for each url
+    response <- GET(url)
+    
+    #if the response works
+    if (http_status(response)$category == "Success") {
+      
+      # grab the json content, the first 3 satellite passes
+      json_data <- fromJSON(rawToChar(response$content))
+      passes_data <- head(json_data$passes$tca,3)
+      
+      # Store the relevant data in the list
+      results[[i]] <- list(state = state, latitude = latitude, longitude = longitude, passes = passes_data)
+    }
+    
+    #if the response didn't work
+    else {
+      cat("Error fetching data for latitude:", latitude, ", longitude:", longitude)
+      
+      results[[i]] <- list(state = state, latitude = latitude, longitude = longitude, error = http_status(response)$message)
+    }
+  }
+  #after the looping, return the list
+  return(results)
+}
+
+api_data <- get_json_info(state_capitals_clean)
+```
+
+function 2 to convert it to a nice df
+```{r}
+convert_api_to_df <- function(api_data) {
+ 
+   # make vectors to store state/lat/long
+  states <- character(length(api_data))
+  latitudes <- numeric(length(api_data))
+  longitudes <- numeric(length(api_data))
+  
+  # create a list to store all pass values
+  all_passes <- vector("list", length(api_data))
+  
+  # initialize the var telling us how many satellite passes (up to 3)
+  max_passes <- 0
+  
+# grab data from each state entry
+  
+  # for every state
+  for (i in 1:length(api_data)) {
+    #store the state specific data for state i
+    state_data <- api_data[[i]]
+    
+    #grab the state specifc data for the df
+    states[i] <- state_data[[1]]  # state
+    latitudes[i] <- state_data[[2]]  # lat
+    longitudes[i] <- state_data[[3]]  # long
+    
+    # store passes and update max_passes (if needed) for the df
+    passes <- state_data[[4]]
+    all_passes[[i]] <- passes
+    max_passes <- max(3, length(passes))
+  }
+  
+  # structure the final df
+  df <- data.frame(
+    state = states,
+    latitude = latitudes,
+    longitude = longitudes
+  )
+  
+# add satellite pass columns based on the maximum number found
+  
+  # for every pass
+  for (p in 1:max_passes) {
+    #create vector to hold pass time 
+    pass_col <- character(length(api_data))
+    
+    # for each state
+    for (i in 1:length(api_data)) {
+      #grab list of passes for current state
+      passes <- all_passes[[i]]
+      #if the pass position exisits for current state
+      if (p <= length(passes)) {
+        #put the pass time in the pass_col vector
+        pass_col[i] <- passes[p]
+      } else {
+        #otherwise put NA in the vector
+        pass_col[i] <- NA
+      }
+    }
+    
+    # make name of pass column for the dataframe
+    colname <- paste0("pass", p)
+    #add col to the dataframe
+    df[[colname]] <- pass_col
+  }
+  
+  return(df)
+}
+
+convert_api_to_df(api_data)
+```
+
+
+
+
+

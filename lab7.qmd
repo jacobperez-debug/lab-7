@@ -5,17 +5,16 @@ format: html
 editor: visual
 ---
 
-<<<<<<< HEAD
-## Quarto
+```{r}
+#| label: load libraries
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+library(dplyr)
+library(httr)
+library(jsonlite)
+```
 
 ```{r}
-library(dplyr)
+#| label: clean dataset
 
 state_capitals <- read.table(here::here("state_capitals_ll.txt"))
 state_capitals <- state_capitals %>% filter(!V1 %in% c("DC", "PR", "US"))
@@ -36,16 +35,8 @@ state_capitals_clean
 ## 1.
 
 ```{r}
-library(httr)
-library(jsonlite)
-```
-
-
-
-```{r}
 res = GET("https://api.g7vrd.co.uk/v1/satellite-passes/25544/32.36154/-86.27912.json")
 ```
-
 
 ```{r}
 library(lubridate)
