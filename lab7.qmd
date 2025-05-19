@@ -211,3 +211,5 @@ leaflet() %>%
   addPolylines(lat = state_capitals_sorted$latitude, lng = state_capitals_sorted$longitude)
   
 ```
+
+This map does not have a label for Juneau, Alaska; Puerto Rico; and Washington D.C. We removed Alaska since there was no pass times for the ISS sattelite. We removed Puerto Rico since this was a U.S. Territoy and we wanted to include the United States capitals. Finally, we removed Washington D.C., since it is not a state capital. This map should refelct only the 50 U.S. State Capitals, with the exception being Juneau as there were no pass times. 
